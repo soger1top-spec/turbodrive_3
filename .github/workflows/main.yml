@@ -42,18 +42,20 @@ jobs:
           cp -r temp_extract/* .
         fi
 
-    - name: Create Buildozer Spec if Missing
+    - name: Configure Buildozer Spec
       run: |
         if [ ! -f buildozer.spec ]; then
           buildozer init
           sed -i 's/title = My Application/title = TurboDrive/g' buildozer.spec
           sed -i 's/package.name = myapp/package.name = turbodrive/g' buildozer.spec
         fi
+        # قبول الشروط تلقائياً وإجبار النظام على نسخة NDK مستقرة
+        sed -i 's/.*android.accept_sdk_license.*/android.accept_sdk_license = True/' buildozer.spec
+        sed -i 's/.*android.ndk =.*/android.ndk = 25b/' buildozer.spec
+        sed -i 's/.*android.api =.*/android.api = 33/' buildozer.spec
 
-    - name: Build APK & Auto-Accept Licenses
-      run: |
-        # هذا الأمر يوافق تلقائياً على كل شروط ورخص أندرويد أثناء البناء
-        yes | buildozer android debug
+    - name: Build APK
+      run: buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
