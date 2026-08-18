@@ -11,13 +11,24 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Clean Environment & Extract Files
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+        pip install buildozer cython virtualenv
+
+    - name: Extract Files
       run: |
         unzip -o turbodrive.zip -d temp_extract
         if [ -d "temp_extract/turbodrive" ]; then
@@ -25,17 +36,18 @@ jobs:
         else
           cp -r temp_extract/* .
         fi
-        if [ ! -f buildozer.spec ]; then
-          wget -q https://raw.githubusercontent.com/kivy/buildozer/master/buildozer/default.spec -O buildozer.spec
-          sed -i 's/title = My Application/title = TurboDrive/g' buildozer.spec
-          sed -i 's/package.name = myapp/package.name = turbodrive/g' buildozer.spec
-        fi
 
-    - name: Build with Buildozer Action
-      uses: ArtemSBulgakov/buildozer-action@v1
-      with:
-        workdir: .
-        buildozer_version: stable
+    - name: Configure Buildozer & Accept Licenses
+      run: |
+        if [ ! -f buildozer.spec ]; then
+          buildozer init
+        fi
+        # إجبار القبول بشروط أندرويد في الملف لتفادي التعليق
+        sed -i 's/.*android.accept_sdk_license.*/android.accept_sdk_license = True/' buildozer.spec
+        grep -q "android.accept_sdk_license = True" buildozer.spec || echo "android.accept_sdk_license = True" >> buildozer.spec
+
+    - name: Build APK
+      run: buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
