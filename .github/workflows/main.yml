@@ -1,0 +1,44 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+concurrency:
+  group: "apk-build-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Clean Environment & Extract Files
+      run: |
+        unzip -o turbodrive.zip -d temp_extract
+        if [ -d "temp_extract/turbodrive" ]; then
+          cp -r temp_extract/turbodrive/* .
+        else
+          cp -r temp_extract/* .
+        fi
+        if [ ! -f buildozer.spec ]; then
+          wget -q https://raw.githubusercontent.com/kivy/buildozer/master/buildozer/default.spec -O buildozer.spec
+          sed -i 's/title = My Application/title = TurboDrive/g' buildozer.spec
+          sed -i 's/package.name = myapp/package.name = turbodrive/g' buildozer.spec
+        fi
+
+    - name: Build with Buildozer Action
+      uses: ArtemSBulgakov/buildozer-action@v1
+      with:
+        workdir: .
+        buildozer_version: stable
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release
+        path: bin/*.apk
