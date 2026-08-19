@@ -45,36 +45,49 @@ jobs:
 
     - name: Configure Buildozer Spec
       run: |
-        if [ ! -f buildozer.spec ]; then
-          buildozer init
-        fi
+        # مسح أي ملف إعدادات قديم
+        rm -f buildozer.spec
+        buildozer init
 
+        # تعديل الإعدادات عبر بايثون لضمان الاستبدال وعدم التكرار 100%
         python3 -c "
         import re
 
         spec_file = 'buildozer.spec'
         with open(spec_file, 'r') as f:
-            content = f.read()
+            lines = f.readlines()
 
-        settings = {
+        keys_to_set = {
             'title': 'TurboDrive',
             'package.name': 'turbodrive',
             'android.accept_sdk_license': 'True',
             'android.api': '33',
-            'android.ndk': '25b',
+            'android.ndk': '26b',
             'android.archs': 'arm64-v8a'
         }
 
-        # تنظيف أي أسطر مكررة لمنع DuplicateOptionError
-        for key in settings.keys():
-            content = re.sub(rf'^\s*#?\s*{re.escape(key)}\s*=.*$', '', content, flags=re.MULTILINE)
+        new_lines = []
+        found_keys = set()
 
-        # إضافة الإعدادات النظيفة تحت قسم [app]
-        app_settings = '\n'.join([f'{k} = {v}' for k, v in settings.items()])
-        content = content.replace('[app]', f'[app]\n{app_settings}')
+        for line in lines:
+            matched_key = None
+            for k in keys_to_set:
+                if re.match(rf'^\s*#?\s*{re.escape(k)}\s*=', line):
+                    matched_key = k
+                    break
+            if matched_key:
+                if matched_key not in found_keys:
+                    new_lines.append(f'{matched_key} = {keys_to_set[matched_key]}\n')
+                    found_keys.add(matched_key)
+            else:
+                new_lines.append(line)
+
+        for k, v in keys_to_set.items():
+            if k not in found_keys:
+                new_lines.append(f'{k} = {v}\n')
 
         with open(spec_file, 'w') as f:
-            f.write(content)
+            f.writelines(new_lines)
         "
 
     - name: Build APK
