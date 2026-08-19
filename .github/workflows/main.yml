@@ -11,28 +11,11 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Free Space & RAM
-      run: |
-        sudo rm -rf /usr/share/dotnet /opt/ghc
-        sudo apt-get clean
-
     - name: Checkout Code
       uses: actions/checkout@v4
-
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-
-    - name: Install System Dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
-        python -m pip install --upgrade pip setuptools
-        python -m pip install "cython==0.29.36" virtualenv buildozer
 
     - name: Extract Files
       run: |
@@ -43,58 +26,36 @@ jobs:
           cp -r temp_extract/. .
         fi
 
-    - name: Configure Buildozer Spec
+    - name: Create Clean buildozer.spec
       run: |
-        rm -f buildozer.spec
-        buildozer init
+        # إنشاء ملف إعدادات جديد كلياً ونظيف 100% بدون أي أوامر تعديل
+        cat <<EOF > buildozer.spec
+        [app]
+        title = TurboDrive
+        package.name = turbodrive
+        package.domain = org.ibrahim.turbodrive
+        source.dir = .
+        source.include_exts = py,png,jpg,kv,atlas,ttf,wav,mp3
+        version = 1.0
+        requirements = python3,kivy==2.3.0
+        orientation = all
+        fullscreen = 1
+        android.archs = arm64-v8a
+        android.accept_sdk_license = True
+        android.api = 33
+        android.minapi = 24
+        android.ndk = 25b
+        [buildozer]
+        log_level = 2
+        warn_on_root = 0
+        EOF
 
-        python3 -c "
-        import re
-
-        spec_file = 'buildozer.spec'
-        with open(spec_file, 'r') as f:
-            lines = f.readlines()
-
-        keys_to_set = {
-            'title': 'TurboDrive',
-            'package.name': 'turbodrive',
-            'requirements': 'python3,kivy==2.3.0',
-            'android.accept_sdk_license': 'True',
-            'android.api': '33',
-            'android.ndk': '26b',
-            'android.archs': 'arm64-v8a'
-        }
-
-        new_lines = []
-        found_keys = set()
-
-        for line in lines:
-            matched_key = None
-            for k in keys_to_set:
-                if re.match(rf'^\s*#?\s*{re.escape(k)}\s*=', line):
-                    matched_key = k
-                    break
-            if matched_key:
-                if matched_key not in found_keys:
-                    new_lines.append(f'{matched_key} = {keys_to_set[matched_key]}\n')
-                    found_keys.add(matched_key)
-            else:
-                new_lines.append(line)
-
-        for k, v in keys_to_set.items():
-            if k not in found_keys:
-                new_lines.append(f'{k} = {v}\n')
-
-        with open(spec_file, 'w') as f:
-            f.writelines(new_lines)
-        "
-
-    - name: Build APK
-      run: |
-        echo "cython==0.29.36" > /tmp/constraints.txt
-        export PIP_CONSTRAINT=/tmp/constraints.txt
-        python -m pip install "cython==0.29.36" --force-reinstall
-        buildozer android debug
+    - name: Build APK with Buildozer Action
+      uses: ArtemSBulgakov/buildozer-action@v1
+      id: buildozer
+      with:
+        command: buildozer android debug
+        buildozer_version: master
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
