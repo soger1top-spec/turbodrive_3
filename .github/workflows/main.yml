@@ -11,11 +11,28 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
+    - name: Free Space & RAM
+      run: |
+        sudo rm -rf /usr/share/dotnet /opt/ghc
+        sudo apt-get clean
+
     - name: Checkout Code
       uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git zip unzip openjdk-17-jdk autoconf automake libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+        python -m pip install --upgrade pip setuptools virtualenv
+        python -m pip install "cython==0.29.36" buildozer
 
     - name: Extract Files
       run: |
@@ -28,7 +45,7 @@ jobs:
 
     - name: Create Clean buildozer.spec
       run: |
-        # إنشاء ملف إعدادات جديد كلياً ونظيف 100% بدون أي أوامر تعديل
+        # إنشاء ملف إعدادات نظيف كلياً بدون أي تكرار
         cat <<EOF > buildozer.spec
         [app]
         title = TurboDrive
@@ -45,17 +62,18 @@ jobs:
         android.api = 33
         android.minapi = 24
         android.ndk = 25b
+        p4a.branch = master
         [buildozer]
         log_level = 2
         warn_on_root = 0
         EOF
 
-    - name: Build APK with Buildozer Action
-      uses: ArtemSBulgakov/buildozer-action@v1
-      id: buildozer
-      with:
-        command: buildozer android debug
-        buildozer_version: master
+    - name: Build APK
+      run: |
+        # حصار يمنع تحميل Cython 3 المضروب في الخلفية
+        echo "cython==0.29.36" > /tmp/constraints.txt
+        export PIP_CONSTRAINT=/tmp/constraints.txt
+        buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
