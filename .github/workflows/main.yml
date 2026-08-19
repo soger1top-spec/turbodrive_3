@@ -47,14 +47,35 @@ jobs:
       run: |
         if [ ! -f buildozer.spec ]; then
           buildozer init
-          sed -i 's/title = My Application/title = TurboDrive/g' buildozer.spec
-          sed -i 's/package.name = myapp/package.name = turbodrive/g' buildozer.spec
         fi
 
-        sed -i 's/^[#[:space:]]*android.accept_sdk_license.*/android.accept_sdk_license = True/' buildozer.spec
-        sed -i 's/^[#[:space:]]*android.api.*/android.api = 33/' buildozer.spec
-        sed -i 's/^[#[:space:]]*android.ndk.*/android.ndk = 25b/' buildozer.spec
-        sed -i 's/^[#[:space:]]*android.archs.*/android.archs = arm64-v8a/' buildozer.spec
+        python3 -c "
+        import re
+
+        spec_file = 'buildozer.spec'
+        with open(spec_file, 'r') as f:
+            content = f.read()
+
+        settings = {
+            'title': 'TurboDrive',
+            'package.name': 'turbodrive',
+            'android.accept_sdk_license': 'True',
+            'android.api': '33',
+            'android.ndk': '25b',
+            'android.archs': 'arm64-v8a'
+        }
+
+        # تنظيف أي أسطر مكررة لمنع DuplicateOptionError
+        for key in settings.keys():
+            content = re.sub(rf'^\s*#?\s*{re.escape(key)}\s*=.*$', '', content, flags=re.MULTILINE)
+
+        # إضافة الإعدادات النظيفة تحت قسم [app]
+        app_settings = '\n'.join([f'{k} = {v}' for k, v in settings.items()])
+        content = content.replace('[app]', f'[app]\n{app_settings}')
+
+        with open(spec_file, 'w') as f:
+            f.write(content)
+        "
 
     - name: Build APK
       run: |
